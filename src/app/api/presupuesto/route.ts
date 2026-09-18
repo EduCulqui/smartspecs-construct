@@ -34,9 +34,12 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({
-      areaConstruidaM2: resultado.areaConstruidaM2,
-      presupuestoMinimo: actualizado.presupuestoMinimo,
-      presupuestoMaximo: actualizado.presupuestoMaximo,
+    areaConstruidaM2: resultado.areaConstruidaM2,
+    presupuestoMinimo: actualizado.presupuestoMinimo,
+    presupuestoMaximo: actualizado.presupuestoMaximo,
+    anchoTerreno: requerimiento.anchoTerreno,
+    largoTerreno: requerimiento.largoTerreno,
+    numeroPisos: requerimiento.numeroPisos,
     });
   } catch (error) {
     console.error("Error en /api/presupuesto:", error);

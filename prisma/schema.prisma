@@ -7,24 +7,31 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Usuario {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  passwordHash   String
+  creadoEn       DateTime        @default(now())
+  requerimientos Requerimiento[]
+}
+
 model Requerimiento {
   id                String   @id @default(cuid())
   creadoEn          DateTime @default(now())
 
-  // Datos del terreno
+  usuarioId         String
+  usuario           Usuario  @relation(fields: [usuarioId], references: [id])
+
   anchoTerreno      Float
   largoTerreno      Float
   numeroPisos       Int
 
-  // Preferencias del usuario (guardadas como texto JSON)
   ambientes         String
   preferencias      String
 
-  // Resultados generados por el sistema
   presupuestoMinimo Float?
   presupuestoMaximo Float?
   plantilla3D       String?
 
-  // Estado del flujo
   estado            String   @default("PENDIENTE")
 }

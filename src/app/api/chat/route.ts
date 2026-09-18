@@ -4,13 +4,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { RequerimientoSchema } from "@/lib/schema";
 import { SYSTEM_PROMPT } from "@/lib/prompt";
 import { prisma } from "@/lib/prisma";
+import { obtenerSesion } from "@/lib/sesion";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function POST(req: NextRequest) {
   try {
+    const sesion = await obtenerSesion();
+    if (!sesion) {
+      return NextResponse.json({ error: "Debes iniciar sesion" }, { status: 401 });
+    }
+
     const { historial } = await req.json();
-    // historial = [{ role: "user" | "model", text: string }, ...]
 
     const contents = historial.map((m: { role: string; text: string }) => ({
       role: m.role,
@@ -18,7 +23,7 @@ export async function POST(req: NextRequest) {
     }));
 
     const respuesta = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-3.5-flash-lite",
       contents,
       config: {
         systemInstruction: SYSTEM_PROMPT,
@@ -36,6 +41,7 @@ export async function POST(req: NextRequest) {
 
         const guardado = await prisma.requerimiento.create({
           data: {
+            usuarioId: sesion.usuarioId,
             anchoTerreno: datosValidados.anchoTerreno,
             largoTerreno: datosValidados.largoTerreno,
             numeroPisos: datosValidados.numeroPisos,
