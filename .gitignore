@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Base de datos local (datos de prueba, no debe ir al repo)
+/prisma/dev.db
+/prisma/dev.db-journal
