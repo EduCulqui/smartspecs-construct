@@ -3,8 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { prisma } from "@/lib/prisma";
 import { PdfDocumento } from "@/lib/PdfDocumento";
+import { obtenerSesion } from "@/lib/sesion";
 
 export async function GET(req: NextRequest) {
+  const sesion = await obtenerSesion();
+  if (!sesion) {
+    return NextResponse.json({ error: "Debes iniciar sesion." }, { status: 401 });
+  }
+
   try {
     const requerimientoId = req.nextUrl.searchParams.get("id");
 
@@ -12,8 +18,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Falta el parámetro id" }, { status: 400 });
     }
 
-    const requerimiento = await prisma.requerimiento.findUnique({
-      where: { id: requerimientoId },
+    const requerimiento = await prisma.requerimiento.findFirst({
+      where: { id: requerimientoId, usuarioId: sesion.usuarioId },
     });
 
     if (!requerimiento) {

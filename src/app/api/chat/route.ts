@@ -3,11 +3,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { obtenerSesion } from "@/lib/sesion";
 import { prisma } from "@/lib/prisma";
-import { HistorialChatSchema, RequerimientoSchema } from "@/lib/schema";
+import { HistorialChatSchema, RequerimientoSchema, RespuestaChatSchema } from "@/lib/schema";
 import { SYSTEM_PROMPT } from "@/lib/prompt";
 import { mensajeErrorIA } from "@/lib/erroresIA";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+const DATOS_VACIOS = {
+  anchoTerreno: null,
+  largoTerreno: null,
+  numeroPisos: null,
+  ambientes: [] as string[],
+  preferencias: "",
+};
 
 export async function POST(req: NextRequest) {
   const sesion = await obtenerSesion();
@@ -53,44 +61,60 @@ export async function POST(req: NextRequest) {
 
   const textoLimpio = textoRespuesta.trim();
 
-  if (textoLimpio.startsWith("{")) {
-    try {
-      const datos = JSON.parse(textoLimpio);
-
-      if (datos.completo && datos.datos) {
-        const requerimientoValidado = RequerimientoSchema.parse(datos.datos);
-
-        const guardado = await prisma.requerimiento.create({
-          data: {
-            usuarioId: sesion.usuarioId,
-            anchoTerreno: requerimientoValidado.anchoTerreno,
-            largoTerreno: requerimientoValidado.largoTerreno,
-            numeroPisos: requerimientoValidado.numeroPisos,
-            ambientes: JSON.stringify(requerimientoValidado.ambientes),
-            preferencias: requerimientoValidado.preferencias ?? "",
-          },
-        });
-
-        return NextResponse.json({
-          mensaje: "Datos recibidos. Calculando tu presupuesto referencial...",
-          completo: true,
-          requerimientoId: guardado.id,
-        });
-      }
-    } catch (error) {
-      console.error("Error al procesar la respuesta estructurada:", error);
-      return NextResponse.json(
-        {
-          error:
-            "No pude validar los datos de tu terreno. Revisa que esten dentro de los rangos permitidos (ancho, largo y numero de pisos) e intentalo de nuevo.",
-        },
-        { status: 400 }
-      );
-    }
+  let parsed;
+  try {
+    parsed = RespuestaChatSchema.parse(JSON.parse(textoLimpio));
+  } catch (error) {
+    console.error("Respuesta de la IA con formato inesperado:", error, textoLimpio);
+    return NextResponse.json({
+      mensaje: "No entendi bien tu respuesta, puedes darme el dato de otra forma?",
+      completo: false,
+      datos: DATOS_VACIOS,
+    });
   }
 
-  return NextResponse.json({
-    mensaje: textoLimpio.replace("[ESTADO:INCOMPLETO]", "").trim(),
-    completo: false,
-  });
+  if (!parsed.completo) {
+    return NextResponse.json({
+      mensaje: parsed.mensaje,
+      completo: false,
+      datos: parsed.datos,
+    });
+  }
+
+  try {
+    const requerimientoValidado = RequerimientoSchema.parse({
+      anchoTerreno: parsed.datos.anchoTerreno,
+      largoTerreno: parsed.datos.largoTerreno,
+      numeroPisos: parsed.datos.numeroPisos,
+      ambientes: parsed.datos.ambientes,
+      preferencias: parsed.datos.preferencias,
+    });
+
+    const guardado = await prisma.requerimiento.create({
+      data: {
+        usuarioId: sesion.usuarioId,
+        anchoTerreno: requerimientoValidado.anchoTerreno,
+        largoTerreno: requerimientoValidado.largoTerreno,
+        numeroPisos: requerimientoValidado.numeroPisos,
+        ambientes: JSON.stringify(requerimientoValidado.ambientes),
+        preferencias: requerimientoValidado.preferencias ?? "",
+      },
+    });
+
+    return NextResponse.json({
+      mensaje: parsed.mensaje,
+      completo: true,
+      datos: parsed.datos,
+      requerimientoId: guardado.id,
+    });
+  } catch (error) {
+    console.error("Error al validar/guardar el requerimiento completo:", error);
+    return NextResponse.json(
+      {
+        error:
+          "No pude validar los datos de tu terreno. Revisa que esten dentro de los rangos permitidos (ancho, largo y numero de pisos) e intentalo de nuevo.",
+      },
+      { status: 400 }
+    );
+  }
 }

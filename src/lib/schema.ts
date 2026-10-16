@@ -38,3 +38,21 @@ export const HistorialChatSchema = z
   .array(MensajeChatSchema)
   .min(1, "El historial no puede estar vacio")
   .max(LIMITES_CHAT.maxMensajesHistorial, "La conversacion es demasiado larga, por favor inicia una nueva");
+
+// Datos que la IA va acumulando turno a turno, antes de estar completos.
+// Los numeros pueden ser null mientras el usuario no los haya dado todavia.
+export const DatosParcialesSchema = z.object({
+  anchoTerreno: z.number().nullable(),
+  largoTerreno: z.number().nullable(),
+  numeroPisos: z.number().int().nullable(),
+  ambientes: z.array(z.string()),
+  preferencias: z.string().optional().default(""),
+});
+
+export const RespuestaChatSchema = z.object({
+  mensaje: z.string(),
+  completo: z.boolean(),
+  datos: DatosParcialesSchema,
+});
+
+export type DatosParciales = z.infer<typeof DatosParcialesSchema>;
