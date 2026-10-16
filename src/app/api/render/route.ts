@@ -1,43 +1,69 @@
 // src/app/api/render/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { obtenerSesion } from "@/lib/sesion";
 import { prisma } from "@/lib/prisma";
+import { mensajeErrorImagen } from "@/lib/erroresIA";
 
 export async function POST(req: NextRequest) {
+  const sesion = await obtenerSesion();
+  if (!sesion) {
+    return NextResponse.json({ error: "Debes iniciar sesion." }, { status: 401 });
+  }
+
+  let body: unknown;
   try {
-    const { requerimientoId } = await req.json();
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Solicitud invalida." }, { status: 400 });
+  }
 
-    const requerimiento = await prisma.requerimiento.findUnique({
-      where: { id: requerimientoId },
-    });
+  const { requerimientoId } = body as { requerimientoId?: string };
+  if (!requerimientoId) {
+    return NextResponse.json({ error: "Falta el identificador del requerimiento." }, { status: 400 });
+  }
 
-    if (!requerimiento) {
-      return NextResponse.json({ error: "Requerimiento no encontrado" }, { status: 404 });
+  const requerimiento = await prisma.requerimiento.findFirst({
+    where: { id: requerimientoId, usuarioId: sesion.usuarioId },
+  });
+  if (!requerimiento) {
+    return NextResponse.json({ error: "Requerimiento no encontrado." }, { status: 404 });
+  }
+
+  const ambientes: string[] = (() => {
+    try {
+      return JSON.parse(requerimiento.ambientes);
+    } catch {
+      return [];
     }
+  })();
 
-    const ambientes: string[] = JSON.parse(requerimiento.ambientes);
+  const prompt = [
+    "fotografia arquitectonica realista, fachada exterior de una vivienda unifamiliar moderna",
+    `${requerimiento.numeroPisos} pisos`,
+    `terreno de ${requerimiento.anchoTerreno}m de ancho por ${requerimiento.largoTerreno}m de largo`,
+    ambientes.length ? `incluye ${ambientes.join(", ")}` : "",
+    requerimiento.preferencias || "",
+    "zona urbana, Cajamarca Peru, luz de dia, alta calidad, 4k",
+  ]
+    .filter(Boolean)
+    .join(", ");
 
-    const prompt = `Professional architectural rendering, photorealistic exterior of a modern single-family house in Cajamarca, Peru. ${requerimiento.numeroPisos} floors, ${requerimiento.anchoTerreno}x${requerimiento.largoTerreno} meter lot. Rooms: ${ambientes.join(", ")}. Style: ${requerimiento.preferencias || "contemporary, clean lines, natural lighting"}. Daylight, clear sky, residential street, high quality real estate photography, 4k`;
-
-    const urlImagen = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+  try {
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
       prompt
     )}?width=1024&height=768&nologo=true&model=flux`;
 
-    // Descargamos la imagen desde Pollinations y la devolvemos como base64
-    const respuestaImagen = await fetch(urlImagen);
-
+    const respuestaImagen = await fetch(url);
     if (!respuestaImagen.ok) {
-      return NextResponse.json({ error: "No se pudo generar la imagen" }, { status: 500 });
+      throw new Error(`Pollinations respondio con estado ${respuestaImagen.status}`);
     }
 
-    const arrayBuffer = await respuestaImagen.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
+    const buffer = await respuestaImagen.arrayBuffer();
+    const imagenBase64 = Buffer.from(buffer).toString("base64");
 
-    return NextResponse.json({
-      imagenBase64: base64,
-      mimeType: "image/jpeg",
-    });
+    return NextResponse.json({ imagenBase64, mimeType: "image/jpeg" });
   } catch (error) {
-    console.error("Error en /api/render:", error);
-    return NextResponse.json({ error: "Error generando la imagen conceptual" }, { status: 500 });
+    console.error("Error al generar la vista conceptual:", error);
+    return NextResponse.json({ error: mensajeErrorImagen(error) }, { status: 502 });
   }
 }

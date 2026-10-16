@@ -1,294 +1,154 @@
 // src/app/page.tsx
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 
-type Mensaje = {
-  role: "user" | "model";
-  text: string;
-};
-
-type Presupuesto = {
-  areaConstruidaM2: number;
-  presupuestoMinimo: number;
-  presupuestoMaximo: number;
-  anchoTerreno: number;
-  largoTerreno: number;
-  numeroPisos: number;
-  preferencias: string;
-};
+const NAVY = "#1E2A47";
+const VIOLET = "#6D4AFF";
+const AMBER = "#D98C4A";
+const BG = "#F5F4FA";
+const GRIS = "#6B7280";
 
 function LogoBadge() {
   return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#1C2E3F]">
+    <div
+      className="flex h-9 w-9 items-center justify-center rounded-lg"
+      style={{ backgroundColor: NAVY }}
+    >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        <path d="M3 21V3h6v6h12v12H3z" stroke="#D9A441" strokeWidth="1.8" />
-        <path d="M3 9h6" stroke="#D9A441" strokeWidth="1.8" />
+        <path d="M3 21V3h6v6h12v12H3z" stroke={AMBER} strokeWidth="1.8" />
+        <path d="M3 9h6" stroke={AMBER} strokeWidth="1.8" />
       </svg>
     </div>
   );
 }
 
-export default function Home() {
-  const [mensajes, setMensajes] = useState<Mensaje[]>([
-    {
-      role: "model",
-      text: "Hola. Soy el asistente de SmartSpecs Construct. Cuentame sobre el terreno donde quieres construir tu vivienda (ancho, largo, numero de pisos) y que ambientes necesitas.",
-    },
-  ]);
-  const [input, setInput] = useState("");
-  const [cargando, setCargando] = useState(false);
-  const [requerimientoId, setRequerimientoId] = useState<string | null>(null);
-  const [presupuesto, setPresupuesto] = useState<Presupuesto | null>(null);
-  const [imagenRender, setImagenRender] = useState<string | null>(null);
-  const [generandoImagen, setGenerandoImagen] = useState(false);
-  const [emailUsuario, setEmailUsuario] = useState<string | null>(null);
-  const finRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
-
-  useEffect(() => {
-    finRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [mensajes]);
-
-  useEffect(() => {
-    fetch("/api/auth/yo")
-      .then((r) => r.json())
-      .then((d) => setEmailUsuario(d.sesion?.email ?? null));
-  }, []);
-
-  async function enviarMensaje() {
-    if (!input.trim() || cargando) return;
-
-    const nuevoHistorial: Mensaje[] = [...mensajes, { role: "user", text: input }];
-    setMensajes(nuevoHistorial);
-    setInput("");
-    setCargando(true);
-
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ historial: nuevoHistorial }),
-      });
-
-      const data = await res.json();
-
-      if (data.error) {
-        setMensajes((prev) => [...prev, { role: "model", text: `Error: ${data.error}` }]);
-        return;
-      }
-
-      setMensajes((prev) => [...prev, { role: "model", text: data.mensaje }]);
-
-      if (data.completo) {
-        setRequerimientoId(data.requerimientoId);
-
-        const resPresupuesto = await fetch("/api/presupuesto", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ requerimientoId: data.requerimientoId }),
-        });
-        const dataPresupuesto = await resPresupuesto.json();
-        setPresupuesto(dataPresupuesto);
-
-        setGenerandoImagen(true);
-        fetch("/api/render", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ requerimientoId: data.requerimientoId }),
-        })
-          .then((r) => r.json())
-          .then((d) => {
-            if (d.imagenBase64) {
-              setImagenRender(`data:${d.mimeType};base64,${d.imagenBase64}`);
-            }
-          })
-          .finally(() => setGenerandoImagen(false));
-      }
-    } catch {
-      setMensajes((prev) => [
-        ...prev,
-        { role: "model", text: "No pude conectarme al servidor. Intenta de nuevo." },
-      ]);
-    } finally {
-      setCargando(false);
-    }
-  }
-
-  function manejarEnter(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") enviarMensaje();
-  }
-
-  async function cerrarSesion() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
-  }
-
+function IlustracionCasa() {
   return (
-    <div className="min-h-screen bg-[#F6F4EF]">
-      {/* Franja superior de acento */}
-      <div className="h-1 bg-gradient-to-r from-[#B0592E] via-[#D9A441] to-[#1C2E3F]" />
+    <div className="relative overflow-hidden rounded-2xl border border-[#E3E1F0] bg-white shadow-lg">
+      <div
+        className="flex items-center justify-between px-4 py-2.5 text-xs font-medium text-white"
+        style={{ backgroundColor: NAVY }}
+      >
+        <span>Ejemplo ilustrativo</span>
+        <span style={{ color: AMBER }}>Lote 160 m2 | 2 niveles</span>
+      </div>
 
-      {/* Barra superior */}
-      <header className="border-b border-[#8A8578]/20 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-3.5">
-          <div className="flex items-center gap-3">
+      <div className="flex items-center justify-center p-8" style={{ backgroundColor: BG }}>
+        <svg viewBox="0 0 260 210" className="w-full max-w-xs" style={{ color: NAVY }}>
+          <polyline points="40,120 130,55 220,120" fill="none" stroke="currentColor" strokeWidth="2" />
+          <rect x="55" y="120" width="150" height="70" fill="none" stroke="currentColor" strokeWidth="2" />
+          <rect x="95" y="150" width="26" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          <rect x="150" y="135" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" />
+
+          <line x1="40" y1="200" x2="220" y2="200" stroke={AMBER} strokeWidth="1.2" strokeDasharray="4 3" />
+          <text x="130" y="209" textAnchor="middle" fontSize="9" fill={AMBER}>
+            10.00 m
+          </text>
+        </svg>
+      </div>
+
+      <div className="flex items-center justify-between border-t border-[#E3E1F0] px-4 py-3">
+        <div>
+          <p className="text-[11px]" style={{ color: GRIS }}>
+            Estimacion preliminar directa
+          </p>
+          <p className="text-sm font-bold" style={{ color: NAVY }}>
+            S/ 185,000 - S/ 212,000
+          </p>
+        </div>
+        <span
+          className="rounded-full px-2 py-1 text-[10px] font-semibold"
+          style={{ backgroundColor: `${AMBER}15`, color: AMBER }}
+        >
+          Margen +/- 15%
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: BG }}>
+      <div className="h-1" style={{ background: `linear-gradient(90deg, ${VIOLET}, ${AMBER})` }} />
+
+      <header className="border-b border-[#E3E1F0] bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5">
+          <div className="flex items-center gap-2">
             <LogoBadge />
-            <div>
-              <p className="text-sm font-semibold text-[#1C2E3F]">SmartSpecs Construct</p>
-              <p className="text-xs text-[#8A8578]">Conceptualizacion de vivienda</p>
-            </div>
+            <span className="text-base font-bold" style={{ color: NAVY }}>
+              SmartSpecs Construct
+            </span>
           </div>
-          <div className="flex items-center gap-3">
-            <a
-              href="/historial"
-              className="rounded-full border border-[#1C2E3F]/15 bg-[#1C2E3F]/5 px-3.5 py-1.5 text-xs font-medium text-[#1C2E3F] transition hover:bg-[#1C2E3F]/10"
-            >
-              Mi historial
-            </a>
-            {emailUsuario && (
-              <span className="hidden text-xs text-[#8A8578] sm:inline">{emailUsuario}</span>
-            )}
-            <button
-              onClick={cerrarSesion}
-              className="rounded-full border border-[#8A8578]/40 px-3.5 py-1.5 text-xs font-semibold text-[#1C2E3F] transition hover:border-[#B0592E] hover:text-[#B0592E]"
-            >
-              Cerrar sesion
-            </button>
-          </div>
+          <Link
+            href="/login"
+            className="rounded-full px-5 py-2 text-sm font-semibold text-white shadow-sm transition"
+            style={{ backgroundColor: NAVY }}
+          >
+            Ingresar
+          </Link>
         </div>
       </header>
 
-      {/* Contenido */}
-      <main className="mx-auto max-w-3xl px-5 py-6">
-        <div className="overflow-hidden rounded-xl border border-[#8A8578]/25 bg-white shadow-sm">
-          {/* Mensajes */}
-          <div className="space-y-3 overflow-y-auto px-5 py-5" style={{ maxHeight: "55vh" }}>
-            {mensajes.map((m, i) => (
-              <div
-                key={i}
-                className={`flex items-end gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                {m.role === "model" && (
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1C2E3F]/10">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                      <path d="M3 21V3h6v6h12v12H3z" stroke="#1C2E3F" strokeWidth="2" />
-                    </svg>
-                  </div>
-                )}
-                <div
-                  className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                    m.role === "user"
-                      ? "rounded-br-sm bg-gradient-to-br from-[#1C2E3F] to-[#233B4F] text-white shadow-sm"
-                      : "rounded-bl-sm border-l-2 border-[#D9A441] bg-[#F6F4EF] text-[#1C2E3F]"
-                  }`}
+      <main className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-5 py-14 lg:grid-cols-2">
+        <div>
+          <span
+            className="inline-block rounded-full px-3 py-1 text-xs font-semibold"
+            style={{ backgroundColor: `${VIOLET}12`, color: VIOLET }}
+          >
+            Metodologia parametrica residencial
+          </span>
+
+          <h1 className="mt-4 text-4xl font-extrabold leading-tight" style={{ color: NAVY }}>
+            Disena y presupuesta tu futura casa con{" "}
+            <span style={{ color: VIOLET, textDecoration: "underline", textUnderlineOffset: 4 }}>
+              Inteligencia Artificial
+            </span>
+          </h1>
+
+          <p className="mt-4 text-base leading-relaxed" style={{ color: GRIS }}>
+            En SmartSpecs Construct te guiamos paso a paso para levantar los requerimientos
+            de tu vivienda unifamiliar (hasta 3 pisos en zona urbana), obtener una
+            estimacion presupuestal y explorar tu vista conceptual antes de construir.
+          </p>
+
+          <div className="mt-7 flex flex-wrap items-center gap-3">
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-base font-semibold text-white shadow-sm transition hover:shadow-md"
+              style={{ backgroundColor: NAVY }}
+            >
+              Iniciar levantamiento de requerimientos
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M5 12h14m0 0l-6-6m6 6l-6 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </Link>
+            <span className="text-sm" style={{ color: GRIS }}>
+              Toma solo 8-10 minutos
+            </span>
+          </div>
+
+          <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {[
+              "Sin tecnicismos complejos",
+              "Enfoque en viviendas hasta 3 pisos",
+              "Estimacion presupuestal inmediata",
+            ].map((item) => (
+              <div key={item} className="flex items-start gap-2 text-sm" style={{ color: NAVY }}>
+                <span
+                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] text-white"
+                  style={{ backgroundColor: VIOLET }}
                 >
-                  {m.text}
-                </div>
+                  ✓
+                </span>
+                {item}
               </div>
             ))}
-            {cargando && (
-              <div className="flex items-end gap-2">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1C2E3F]/10">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                    <path d="M3 21V3h6v6h12v12H3z" stroke="#1C2E3F" strokeWidth="2" />
-                  </svg>
-                </div>
-                <div className="rounded-2xl rounded-bl-sm border-l-2 border-[#D9A441] bg-[#F6F4EF] px-4 py-2.5 text-sm text-[#8A8578]">
-                  Escribiendo...
-                </div>
-              </div>
-            )}
-            <div ref={finRef} />
-          </div>
-
-          {/* Panel de resultados */}
-          {requerimientoId && (
-            <div className="border-t-2 border-[#D9A441] bg-gradient-to-b from-[#FBF7EE] to-[#F6F4EF] px-5 py-5">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#3F7D58]/10 px-2.5 py-1 text-xs font-semibold text-[#3F7D58]">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#3F7D58]" />
-                  Requerimiento guardado
-                </span>
-              </div>
-
-              {presupuesto ? (
-                <div className="mt-4 space-y-5">
-                  <div className="rounded-lg border border-[#8A8578]/20 bg-white p-4">
-                    <p className="text-sm text-[#1C2E3F]">
-                      {`Area construida estimada: ${presupuesto.areaConstruidaM2} m2`}
-                    </p>
-                    <p className="mt-1 text-xl font-bold text-[#B0592E]">
-                      {`S/ ${presupuesto.presupuestoMinimo.toLocaleString()} - S/ ${presupuesto.presupuestoMaximo.toLocaleString()}`}
-                    </p>
-                    <p className="mt-0.5 text-xs text-[#8A8578]">
-                      Estimacion preliminar, sujeta a revision profesional.
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-[#1C2E3F]">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#D9A441]" />
-                      Vista conceptual generada por IA
-                    </p>
-                    {generandoImagen && (
-                      <div className="flex h-48 items-center justify-center rounded-lg border border-[#8A8578]/20 bg-white text-sm text-[#8A8578]">
-                        Generando vista conceptual...
-                      </div>
-                    )}
-                    {imagenRender && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={imagenRender}
-                        alt="Vista conceptual de la vivienda"
-                        className="w-full rounded-lg border border-[#8A8578]/20 shadow-sm"
-                      />
-                    )}
-                  </div>
-
-                  <a
-                    href={`/api/documento?id=${requerimientoId}`}
-                    className="inline-flex items-center gap-2 rounded-md bg-[#B0592E] px-4 py-2.5 text-xs font-semibold text-white shadow-sm shadow-[#B0592E]/30 transition hover:bg-[#95492A] hover:shadow-md hover:shadow-[#B0592E]/40"
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16"
-                        stroke="white"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    Descargar documento PDF
-                  </a>
-                </div>
-              ) : (
-                <p className="mt-3 text-sm text-[#8A8578]">Calculando presupuesto...</p>
-              )}
-            </div>
-          )}
-
-          {/* Entrada de texto */}
-          <div className="flex gap-2 border-t border-[#8A8578]/20 bg-white p-4">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={manejarEnter}
-              disabled={cargando || !!requerimientoId}
-              placeholder="Escribe tu mensaje..."
-              className="flex-1 rounded-full border border-[#8A8578]/40 px-4 py-2.5 text-sm text-[#1C2E3F] outline-none transition focus:border-[#B0592E] focus:ring-2 focus:ring-[#B0592E]/15 disabled:bg-[#F6F4EF]"
-            />
-            <button
-              onClick={enviarMensaje}
-              disabled={cargando || !!requerimientoId}
-              className="rounded-full bg-[#1C2E3F] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#152431] hover:shadow-md disabled:opacity-40 disabled:shadow-none"
-            >
-              Enviar
-            </button>
           </div>
         </div>
+
+        <IlustracionCasa />
       </main>
     </div>
   );

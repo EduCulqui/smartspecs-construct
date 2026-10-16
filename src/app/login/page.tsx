@@ -83,7 +83,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/");
+      router.push("/levantamiento");
       router.refresh();
     } catch {
       setError("No se pudo conectar al servidor");

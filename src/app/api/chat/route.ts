@@ -1,73 +1,96 @@
 // src/app/api/chat/route.ts
-import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
-import { RequerimientoSchema } from "@/lib/schema";
-import { SYSTEM_PROMPT } from "@/lib/prompt";
-import { prisma } from "@/lib/prisma";
+import { GoogleGenAI } from "@google/genai";
 import { obtenerSesion } from "@/lib/sesion";
+import { prisma } from "@/lib/prisma";
+import { HistorialChatSchema, RequerimientoSchema } from "@/lib/schema";
+import { SYSTEM_PROMPT } from "@/lib/prompt";
+import { mensajeErrorIA } from "@/lib/erroresIA";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function POST(req: NextRequest) {
+  const sesion = await obtenerSesion();
+  if (!sesion) {
+    return NextResponse.json({ error: "Debes iniciar sesion." }, { status: 401 });
+  }
+
+  let body: unknown;
   try {
-    const sesion = await obtenerSesion();
-    if (!sesion) {
-      return NextResponse.json({ error: "Debes iniciar sesion" }, { status: 401 });
-    }
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Solicitud invalida." }, { status: 400 });
+  }
 
-    const { historial } = await req.json();
+  const { historial } = body as { historial?: unknown };
 
-    const contents = historial.map((m: { role: string; text: string }) => ({
-      role: m.role,
-      parts: [{ text: m.text }],
-    }));
+  const resultadoHistorial = HistorialChatSchema.safeParse(historial);
+  if (!resultadoHistorial.success) {
+    return NextResponse.json(
+      { error: resultadoHistorial.error.issues[0]?.message ?? "Historial de conversacion invalido." },
+      { status: 400 }
+    );
+  }
+  const historialValidado = resultadoHistorial.data;
 
+  const contents = historialValidado.map((m) => ({
+    role: m.role === "user" ? "user" : "model",
+    parts: [{ text: m.text }],
+  }));
+
+  let textoRespuesta: string;
+  try {
     const respuesta = await ai.models.generateContent({
       model: "gemini-3.5-flash-lite",
       contents,
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-      },
+      config: { systemInstruction: SYSTEM_PROMPT },
     });
+    textoRespuesta = respuesta.text ?? "";
+  } catch (error) {
+    console.error("Error al llamar a Gemini:", error);
+    return NextResponse.json({ error: mensajeErrorIA(error) }, { status: 502 });
+  }
 
-    const texto = respuesta.text ?? "";
+  const textoLimpio = textoRespuesta.trim();
 
-    const posibleJson = texto.trim();
-    if (posibleJson.startsWith("{")) {
-      const parsed = JSON.parse(posibleJson);
+  if (textoLimpio.startsWith("{")) {
+    try {
+      const datos = JSON.parse(textoLimpio);
 
-      if (parsed.completo === true) {
-        const datosValidados = RequerimientoSchema.parse(parsed.datos);
+      if (datos.completo && datos.datos) {
+        const requerimientoValidado = RequerimientoSchema.parse(datos.datos);
 
         const guardado = await prisma.requerimiento.create({
           data: {
             usuarioId: sesion.usuarioId,
-            anchoTerreno: datosValidados.anchoTerreno,
-            largoTerreno: datosValidados.largoTerreno,
-            numeroPisos: datosValidados.numeroPisos,
-            ambientes: JSON.stringify(datosValidados.ambientes),
-            preferencias: datosValidados.preferencias ?? "",
-            estado: "VALIDADO",
+            anchoTerreno: requerimientoValidado.anchoTerreno,
+            largoTerreno: requerimientoValidado.largoTerreno,
+            numeroPisos: requerimientoValidado.numeroPisos,
+            ambientes: JSON.stringify(requerimientoValidado.ambientes),
+            preferencias: requerimientoValidado.preferencias ?? "",
           },
         });
 
         return NextResponse.json({
+          mensaje: "Datos recibidos. Calculando tu presupuesto referencial...",
           completo: true,
           requerimientoId: guardado.id,
-          mensaje: "¡Listo! Ya tengo todos tus datos. Generando tu propuesta...",
         });
       }
+    } catch (error) {
+      console.error("Error al procesar la respuesta estructurada:", error);
+      return NextResponse.json(
+        {
+          error:
+            "No pude validar los datos de tu terreno. Revisa que esten dentro de los rangos permitidos (ancho, largo y numero de pisos) e intentalo de nuevo.",
+        },
+        { status: 400 }
+      );
     }
-
-    return NextResponse.json({
-      completo: false,
-      mensaje: texto.replace("[ESTADO:INCOMPLETO]", "").trim(),
-    });
-  } catch (error) {
-    console.error("Error en /api/chat:", error);
-    return NextResponse.json(
-      { error: "Ocurrió un error procesando tu mensaje. Intenta de nuevo." },
-      { status: 500 }
-    );
   }
+
+  return NextResponse.json({
+    mensaje: textoLimpio.replace("[ESTADO:INCOMPLETO]", "").trim(),
+    completo: false,
+  });
 }

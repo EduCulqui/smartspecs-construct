@@ -1,31 +1,40 @@
 // src/lib/schema.ts
 import { z } from "zod";
-import { REGLAS_PILOTO } from "./reglas";
+import { REGLAS_PILOTO, LIMITES_CHAT } from "./reglas";
 
-// Este es el "molde" exacto que la IA debe llenar.
-// Si la respuesta de la IA no calza aquí, se rechaza automáticamente.
 export const RequerimientoSchema = z.object({
   anchoTerreno: z
     .number()
-    .min(REGLAS_PILOTO.minAnchoTerreno, "El ancho del terreno es muy pequeño para el piloto")
-    .max(REGLAS_PILOTO.maxAnchoTerreno, "El ancho del terreno excede el rango del piloto"),
-
+    .min(REGLAS_PILOTO.minAnchoTerreno, `El ancho minimo permitido es ${REGLAS_PILOTO.minAnchoTerreno} m`)
+    .max(REGLAS_PILOTO.maxAnchoTerreno, `El ancho maximo permitido es ${REGLAS_PILOTO.maxAnchoTerreno} m`),
   largoTerreno: z
     .number()
-    .min(REGLAS_PILOTO.minLargoTerreno)
-    .max(REGLAS_PILOTO.maxLargoTerreno),
-
+    .min(REGLAS_PILOTO.minLargoTerreno, `El largo minimo permitido es ${REGLAS_PILOTO.minLargoTerreno} m`)
+    .max(REGLAS_PILOTO.maxLargoTerreno, `El largo maximo permitido es ${REGLAS_PILOTO.maxLargoTerreno} m`),
   numeroPisos: z
     .number()
-    .int()
-    .min(1)
-    .max(REGLAS_PILOTO.maxPisos, `El piloto solo admite hasta ${REGLAS_PILOTO.maxPisos} pisos`),
-
+    .int("El numero de pisos debe ser un numero entero")
+    .min(1, "Debe tener al menos 1 piso")
+    .max(REGLAS_PILOTO.maxPisos, `El maximo permitido es ${REGLAS_PILOTO.maxPisos} pisos`),
   ambientes: z
-    .array(z.string())
-    .min(1, "Debe registrarse al menos un ambiente"),
-
-  preferencias: z.string().optional().default(""),
+    .array(z.string().min(1).max(60))
+    .min(1, "Debes indicar al menos un ambiente")
+    .max(25, "Demasiados ambientes en una sola solicitud"),
+  preferencias: z.string().max(500, "La descripcion de preferencias es demasiado larga").optional(),
 });
 
-export type Requerimiento = z.infer<typeof RequerimientoSchema>;
+export const MensajeChatSchema = z.object({
+  role: z.enum(["user", "model"]),
+  text: z
+    .string()
+    .min(1, "El mensaje no puede estar vacio")
+    .max(
+      LIMITES_CHAT.maxCaracteresPorMensaje,
+      `El mensaje supera el limite de ${LIMITES_CHAT.maxCaracteresPorMensaje} caracteres`
+    ),
+});
+
+export const HistorialChatSchema = z
+  .array(MensajeChatSchema)
+  .min(1, "El historial no puede estar vacio")
+  .max(LIMITES_CHAT.maxMensajesHistorial, "La conversacion es demasiado larga, por favor inicia una nueva");
